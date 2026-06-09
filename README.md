@@ -69,6 +69,8 @@ JWT_SECRET=your-long-random-secret
 JWT_EXPIRES_IN=7d
 ```
 
+You can copy `.env.example` and fill in your real values.
+
 ## MongoDB Atlas Setup
 
 1. Create a MongoDB Atlas cluster.
@@ -90,6 +92,33 @@ Production:
 ```bash
 npm start
 ```
+
+## Deploying to Render
+
+This repo includes [render.yaml](/Users/christinecai/Desktop/Software%20Engineering%20Bootcamp/Capstone%20Project/capstone-backend/render.yaml:1), so you can deploy it as a Blueprint or copy the same values into a manual Web Service.
+
+### Manual Render setup
+
+1. Create a new `Web Service`.
+2. Connect this GitHub repo.
+3. Use:
+   - Build command: `npm install`
+   - Start command: `npm start`
+   - Runtime: `Node`
+4. Add these environment variables in Render:
+   - `MONGODB_URI`
+   - `MONGODB_DB_NAME=equischedule`
+   - `JWT_SECRET`
+   - `JWT_EXPIRES_IN=7d`
+   - `NODE_VERSION=20`
+5. Deploy and open the service URL.
+
+### Atlas requirements for Render
+
+- Use a real MongoDB Atlas connection string in `MONGODB_URI`.
+- Make sure your Atlas database user has read/write access.
+- In Atlas `Network Access`, allow Render to connect.
+  For testing, `0.0.0.0/0` is the simplest option.
 
 Root route:
 
