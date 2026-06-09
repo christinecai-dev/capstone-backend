@@ -7,6 +7,13 @@ const authorizeRoles = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
+function populateShow(query) {
+  return query
+    .populate('horseId', 'name')
+    .populate('trainerId', 'name email role')
+    .populate('riderId', 'name email role');
+}
+
 router.use(authMiddleware);
 router.use(authorizeRoles('trainer', 'student'));
 
@@ -16,15 +23,16 @@ router.get('/', async (req, res) => {
       ? { trainerId: req.user._id }
       : { riderId: req.user._id };
 
-  const shows = await ShowSchedule.find(filter).sort({ showTime: 1 });
+  const shows = await populateShow(ShowSchedule.find(filter)).sort({ showTime: 1 });
   return res.json(shows);
 });
 
 router.post('/', authorizeRoles('trainer'), async (req, res) => {
   try {
-    const [horse, rider] = await Promise.all([
+    const [horse, rider, trainer] = await Promise.all([
       Horse.findById(req.body.horseId),
       User.findOne({ _id: req.body.riderId, role: 'student' }),
+      User.findOne({ _id: req.user._id, role: 'trainer' }),
     ]);
 
     if (!horse) {
@@ -35,12 +43,17 @@ router.post('/', authorizeRoles('trainer'), async (req, res) => {
       return res.status(404).json({ message: 'Rider not found.' });
     }
 
+    if (!trainer) {
+      return res.status(403).json({ message: 'Trainer account not found.' });
+    }
+
     const showSchedule = await ShowSchedule.create({
       ...req.body,
       trainerId: req.user._id,
     });
 
-    return res.status(201).json(showSchedule);
+    const populatedShow = await populateShow(ShowSchedule.findById(showSchedule._id));
+    return res.status(201).json(populatedShow);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -91,7 +104,8 @@ router.put('/:id', async (req, res) => {
     Object.assign(showSchedule, req.body);
     await showSchedule.save();
 
-    return res.json(showSchedule);
+    const populatedShow = await populateShow(ShowSchedule.findById(showSchedule._id));
+    return res.json(populatedShow);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }

@@ -6,11 +6,15 @@ const authorizeRoles = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
+function populateEvent(query) {
+  return query.populate('horseId', 'name');
+}
+
 router.use(authMiddleware);
 router.use(authorizeRoles('owner'));
 
 router.get('/', async (req, res) => {
-  const events = await Event.find({ ownerId: req.user._id }).sort({ date: 1 });
+  const events = await populateEvent(Event.find({ ownerId: req.user._id })).sort({ date: 1 });
   return res.json(events);
 });
 
@@ -29,7 +33,8 @@ router.post('/', async (req, res) => {
       ownerId: req.user._id,
     });
 
-    return res.status(201).json(event);
+    const populatedEvent = await populateEvent(Event.findById(event._id));
+    return res.status(201).json(populatedEvent);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -57,7 +62,8 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Event not found.' });
     }
 
-    return res.json(event);
+    const populatedEvent = await populateEvent(Event.findById(event._id));
+    return res.json(populatedEvent);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }

@@ -8,6 +8,7 @@ const horseRoutes = require('./routes/horseRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const lessonRoutes = require('./routes/lessonRoutes');
+const lookupsRoutes = require('./routes/lookupsRoutes');
 const showRoutes = require('./routes/showRoutes');
 
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api/horses', horseRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/lessons', lessonRoutes);
+app.use('/api/lookups', lookupsRoutes);
 app.use('/api/shows', showRoutes);
 
 app.use((req, res) => {

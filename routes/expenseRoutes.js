@@ -6,6 +6,10 @@ const authorizeRoles = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
+function populateExpense(query) {
+  return query.populate('horseId', 'name');
+}
+
 router.use(authMiddleware);
 router.use(authorizeRoles('owner'));
 
@@ -95,7 +99,7 @@ router.get('/yearly', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const expenses = await Expense.find({ ownerId: req.user._id }).sort({ date: -1 });
+  const expenses = await populateExpense(Expense.find({ ownerId: req.user._id })).sort({ date: -1 });
   return res.json(expenses);
 });
 
@@ -114,7 +118,8 @@ router.post('/', async (req, res) => {
       ownerId: req.user._id,
     });
 
-    return res.status(201).json(expense);
+    const populatedExpense = await populateExpense(Expense.findById(expense._id));
+    return res.status(201).json(populatedExpense);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -142,7 +147,8 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Expense not found.' });
     }
 
-    return res.json(expense);
+    const populatedExpense = await populateExpense(Expense.findById(expense._id));
+    return res.json(populatedExpense);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }

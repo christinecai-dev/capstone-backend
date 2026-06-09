@@ -7,6 +7,13 @@ const authorizeRoles = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
+function populateLesson(query) {
+  return query
+    .populate('horseId', 'name')
+    .populate('trainerId', 'name email role')
+    .populate('studentId', 'name email role');
+}
+
 router.use(authMiddleware);
 router.use(authorizeRoles('trainer', 'student'));
 
@@ -16,16 +23,21 @@ router.get('/', async (req, res) => {
       ? { trainerId: req.user._id }
       : { studentId: req.user._id };
 
-  const lessons = await Lesson.find(filter).sort({ date: 1, time: 1 });
+  const lessons = await populateLesson(Lesson.find(filter)).sort({ date: 1, time: 1 });
   return res.json(lessons);
 });
 
 router.post('/', authorizeRoles('trainer'), async (req, res) => {
   try {
-    const [horse, student] = await Promise.all([
+    const [horse, trainer, student] = await Promise.all([
       Horse.findById(req.body.horseId),
+      User.findOne({ _id: req.user._id, role: 'trainer' }),
       User.findOne({ _id: req.body.studentId, role: 'student' }),
     ]);
+
+    if (!trainer) {
+      return res.status(403).json({ message: 'Trainer account not found.' });
+    }
 
     if (!horse) {
       return res.status(404).json({ message: 'Horse not found.' });
@@ -40,7 +52,8 @@ router.post('/', authorizeRoles('trainer'), async (req, res) => {
       trainerId: req.user._id,
     });
 
-    return res.status(201).json(lesson);
+    const populatedLesson = await populateLesson(Lesson.findById(lesson._id));
+    return res.status(201).json(populatedLesson);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -91,7 +104,8 @@ router.put('/:id', async (req, res) => {
     Object.assign(lesson, req.body);
     await lesson.save();
 
-    return res.json(lesson);
+    const populatedLesson = await populateLesson(Lesson.findById(lesson._id));
+    return res.json(populatedLesson);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
