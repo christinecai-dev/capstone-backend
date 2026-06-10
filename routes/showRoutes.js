@@ -53,7 +53,7 @@ router.post('/', authorizeRoles('owner', 'trainer'), async (req, res) => {
       req.user.role === 'owner'
         ? ownerCanAccessHorse(req.user._id, req.body.horseId)
         : Horse.findById(req.body.horseId),
-      User.findOne({ _id: req.body.riderId, role: 'student' }),
+      req.body.riderId ? User.findOne({ _id: req.body.riderId, role: 'student' }) : null,
       User.findOne({
         _id: req.user.role === 'trainer' ? req.user._id : req.body.trainerId,
         role: 'trainer',
@@ -64,7 +64,7 @@ router.post('/', authorizeRoles('owner', 'trainer'), async (req, res) => {
       return res.status(404).json({ message: 'Horse not found.' });
     }
 
-    if (!rider) {
+    if (req.body.riderId && !rider) {
       return res.status(404).json({ message: 'Rider not found.' });
     }
 
@@ -97,7 +97,7 @@ router.put('/:id', async (req, res) => {
     if (req.user.role === 'trainer') {
       hasAccess = showSchedule.trainerId.toString() === req.user._id.toString();
     } else if (req.user.role === 'student') {
-      hasAccess = showSchedule.riderId.toString() === req.user._id.toString();
+      hasAccess = Boolean(showSchedule.riderId) && showSchedule.riderId.toString() === req.user._id.toString();
     } else {
       hasAccess = await ownerCanAccessShow(req.user._id, showSchedule);
     }
@@ -108,6 +108,7 @@ router.put('/:id', async (req, res) => {
 
     if (req.user.role === 'student') {
       delete req.body.riderId;
+      delete req.body.riderName;
       delete req.body.trainerId;
     }
 
@@ -137,6 +138,10 @@ router.put('/:id', async (req, res) => {
       if (!rider) {
         return res.status(404).json({ message: 'Rider not found.' });
       }
+    }
+
+    if (!req.body.riderId && Object.prototype.hasOwnProperty.call(req.body, 'riderId')) {
+      req.body.riderId = null;
     }
 
     if (req.user.role === 'owner' && req.body.trainerId) {

@@ -11,8 +11,13 @@ const showScheduleSchema = new mongoose.Schema(
     riderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
       index: true,
+    },
+    riderName: {
+      type: String,
+      trim: true,
+      default: '',
     },
     trainerId: {
       type: mongoose.Schema.Types.ObjectId,
