@@ -15,41 +15,43 @@ function populateLesson(query) {
 }
 
 router.use(authMiddleware);
-router.use(authorizeRoles('trainer', 'student'));
+router.use(authorizeRoles('owner'));
 
 router.get('/', async (req, res) => {
-  const filter =
-    req.user.role === 'trainer'
-      ? { trainerId: req.user._id }
-      : { studentId: req.user._id };
-
-  const lessons = await populateLesson(Lesson.find(filter)).sort({ date: 1, time: 1 });
+  const lessons = await populateLesson(Lesson.find({ ownerId: req.user._id })).sort({ date: 1, time: 1 });
   return res.json(lessons);
 });
 
-router.post('/', authorizeRoles('trainer'), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const [horse, trainer, student] = await Promise.all([
-      Horse.findById(req.body.horseId),
-      User.findOne({ _id: req.user._id, role: 'trainer' }),
-      User.findOne({ _id: req.body.studentId, role: 'student' }),
-    ]);
-
-    if (!trainer) {
-      return res.status(403).json({ message: 'Trainer account not found.' });
-    }
+    const horse = await Horse.findOne({ _id: req.body.horseId, ownerId: req.user._id });
 
     if (!horse) {
       return res.status(404).json({ message: 'Horse not found.' });
     }
 
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found.' });
+    let trainer = null;
+    let student = null;
+
+    if (req.body.trainerId) {
+      trainer = await User.findById(req.body.trainerId);
+
+      if (!trainer) {
+        return res.status(404).json({ message: 'Trainer not found.' });
+      }
+    }
+
+    if (req.body.studentId) {
+      student = await User.findById(req.body.studentId);
+
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found.' });
+      }
     }
 
     const lesson = await Lesson.create({
       ...req.body,
-      trainerId: req.user._id,
+      ownerId: req.user._id,
     });
 
     const populatedLesson = await populateLesson(Lesson.findById(lesson._id));
@@ -63,30 +65,12 @@ router.put('/:id', async (req, res) => {
   try {
     const lesson = await Lesson.findById(req.params.id);
 
-    if (!lesson) {
+    if (!lesson || lesson.ownerId.toString() !== req.user._id.toString()) {
       return res.status(404).json({ message: 'Lesson not found.' });
     }
 
-    const hasAccess =
-      req.user.role === 'trainer'
-        ? lesson.trainerId.toString() === req.user._id.toString()
-        : lesson.studentId.toString() === req.user._id.toString();
-
-    if (!hasAccess) {
-      return res.status(403).json({ message: 'You do not have access to this lesson.' });
-    }
-
-    if (req.user.role === 'student') {
-      delete req.body.studentId;
-      delete req.body.trainerId;
-    }
-
-    if (req.user.role === 'trainer') {
-      delete req.body.trainerId;
-    }
-
     if (req.body.studentId) {
-      const student = await User.findOne({ _id: req.body.studentId, role: 'student' });
+      const student = await User.findById(req.body.studentId);
 
       if (!student) {
         return res.status(404).json({ message: 'Student not found.' });
@@ -94,10 +78,18 @@ router.put('/:id', async (req, res) => {
     }
 
     if (req.body.horseId) {
-      const horse = await Horse.findById(req.body.horseId);
+      const horse = await Horse.findOne({ _id: req.body.horseId, ownerId: req.user._id });
 
       if (!horse) {
         return res.status(404).json({ message: 'Horse not found.' });
+      }
+    }
+
+    if (req.body.trainerId) {
+      const trainer = await User.findById(req.body.trainerId);
+
+      if (!trainer) {
+        return res.status(404).json({ message: 'Trainer not found.' });
       }
     }
 
@@ -111,10 +103,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', authorizeRoles('trainer'), async (req, res) => {
+router.delete('/:id', async (req, res) => {
   const lesson = await Lesson.findOneAndDelete({
     _id: req.params.id,
-    trainerId: req.user._id,
+    ownerId: req.user._id,
   });
 
   if (!lesson) {

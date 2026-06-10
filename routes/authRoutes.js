@@ -19,10 +19,14 @@ function createToken(user) {
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role = 'owner' } = req.body;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ message: 'Name, email, password, and role are required.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required.' });
+    }
+
+    if (role !== 'owner') {
+      return res.status(400).json({ message: 'Only owner accounts are supported.' });
     }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
@@ -35,7 +39,7 @@ router.post('/register', async (req, res) => {
       name,
       email,
       password,
-      role,
+      role: 'owner',
     });
 
     const token = createToken(user);

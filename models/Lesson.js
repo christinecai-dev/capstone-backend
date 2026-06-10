@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const lessonSchema = new mongoose.Schema(
   {
+    ownerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
     horseId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Horse',
@@ -10,14 +16,24 @@ const lessonSchema = new mongoose.Schema(
     trainerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
       index: true,
+    },
+    trainerName: {
+      type: String,
+      trim: true,
+      default: '',
     },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
       index: true,
+    },
+    studentName: {
+      type: String,
+      trim: true,
+      default: '',
     },
     date: {
       type: Date,

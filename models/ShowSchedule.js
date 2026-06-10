@@ -3,6 +3,12 @@ const { calculateShowPlannerTimes } = require('../utils/showPlanner');
 
 const showScheduleSchema = new mongoose.Schema(
   {
+    ownerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
     horseId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Horse',
@@ -22,8 +28,13 @@ const showScheduleSchema = new mongoose.Schema(
     trainerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
       index: true,
+    },
+    trainerName: {
+      type: String,
+      trim: true,
+      default: '',
     },
     showName: {
       type: String,

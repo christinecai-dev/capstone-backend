@@ -6,11 +6,16 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 router.use(authMiddleware);
+router.use((req, res, next) => {
+  if (req.user.role !== 'owner') {
+    return res.status(403).json({ message: 'You do not have access to this resource.' });
+  }
+
+  return next();
+});
 
 router.get('/horses', async (req, res) => {
-  const filter = req.user.role === 'owner' ? { ownerId: req.user._id } : {};
-
-  const horses = await Horse.find(filter)
+  const horses = await Horse.find({ ownerId: req.user._id })
     .select('name ownerId age notes')
     .populate('ownerId', 'name email role')
     .sort({ name: 1 });
@@ -18,28 +23,12 @@ router.get('/horses', async (req, res) => {
   return res.json(horses);
 });
 
-router.get('/trainers', async (_req, res) => {
-  const trainers = await User.find({ role: 'trainer' })
+router.get('/owners', async (_req, res) => {
+  const owners = await User.find({ role: 'owner' })
     .select('name email role')
     .sort({ name: 1 });
 
-  return res.json(trainers);
-});
-
-router.get('/students', async (_req, res) => {
-  const students = await User.find({ role: 'student' })
-    .select('name email role')
-    .sort({ name: 1 });
-
-  return res.json(students);
-});
-
-router.get('/riders', async (_req, res) => {
-  const riders = await User.find({ role: 'student' })
-    .select('name email role')
-    .sort({ name: 1 });
-
-  return res.json(riders);
+  return res.json(owners);
 });
 
 module.exports = router;

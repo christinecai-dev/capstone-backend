@@ -24,40 +24,23 @@ async function ownerCanAccessShow(ownerId, showSchedule) {
     return false;
   }
 
-  const horse = await ownerCanAccessHorse(ownerId, showSchedule.horseId);
-  return Boolean(horse);
+  return showSchedule.ownerId.toString() === ownerId.toString();
 }
 
 router.use(authMiddleware);
-router.use(authorizeRoles('owner', 'trainer', 'student'));
+router.use(authorizeRoles('owner'));
 
 router.get('/', async (req, res) => {
-  let filter;
-
-  if (req.user.role === 'trainer') {
-    filter = { trainerId: req.user._id };
-  } else if (req.user.role === 'student') {
-    filter = { riderId: req.user._id };
-  } else {
-    const ownedHorseIds = await Horse.find({ ownerId: req.user._id }).distinct('_id');
-    filter = { horseId: { $in: ownedHorseIds } };
-  }
-
-  const shows = await populateShow(ShowSchedule.find(filter)).sort({ showTime: 1 });
+  const shows = await populateShow(ShowSchedule.find({ ownerId: req.user._id })).sort({ showTime: 1 });
   return res.json(shows);
 });
 
-router.post('/', authorizeRoles('owner', 'trainer'), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const [horse, rider, trainer] = await Promise.all([
-      req.user.role === 'owner'
-        ? ownerCanAccessHorse(req.user._id, req.body.horseId)
-        : Horse.findById(req.body.horseId),
-      req.body.riderId ? User.findOne({ _id: req.body.riderId, role: 'student' }) : null,
-      User.findOne({
-        _id: req.user.role === 'trainer' ? req.user._id : req.body.trainerId,
-        role: 'trainer',
-      }),
+      ownerCanAccessHorse(req.user._id, req.body.horseId),
+      req.body.riderId ? User.findById(req.body.riderId) : null,
+      req.body.trainerId ? User.findById(req.body.trainerId) : null,
     ]);
 
     if (!horse) {
@@ -68,13 +51,13 @@ router.post('/', authorizeRoles('owner', 'trainer'), async (req, res) => {
       return res.status(404).json({ message: 'Rider not found.' });
     }
 
-    if (!trainer) {
-      return res.status(403).json({ message: 'Trainer account not found.' });
+    if (req.body.trainerId && !trainer) {
+      return res.status(404).json({ message: 'Trainer not found.' });
     }
 
     const showSchedule = await ShowSchedule.create({
       ...req.body,
-      trainerId: req.user.role === 'trainer' ? req.user._id : req.body.trainerId,
+      ownerId: req.user._id,
     });
 
     const populatedShow = await populateShow(ShowSchedule.findById(showSchedule._id));
@@ -88,32 +71,8 @@ router.put('/:id', async (req, res) => {
   try {
     const showSchedule = await ShowSchedule.findById(req.params.id);
 
-    if (!showSchedule) {
+    if (!showSchedule || !(await ownerCanAccessShow(req.user._id, showSchedule))) {
       return res.status(404).json({ message: 'Show schedule not found.' });
-    }
-
-    let hasAccess = false;
-
-    if (req.user.role === 'trainer') {
-      hasAccess = showSchedule.trainerId.toString() === req.user._id.toString();
-    } else if (req.user.role === 'student') {
-      hasAccess = Boolean(showSchedule.riderId) && showSchedule.riderId.toString() === req.user._id.toString();
-    } else {
-      hasAccess = await ownerCanAccessShow(req.user._id, showSchedule);
-    }
-
-    if (!hasAccess) {
-      return res.status(403).json({ message: 'You do not have access to this show schedule.' });
-    }
-
-    if (req.user.role === 'student') {
-      delete req.body.riderId;
-      delete req.body.riderName;
-      delete req.body.trainerId;
-    }
-
-    if (req.user.role === 'trainer') {
-      delete req.body.trainerId;
     }
 
     if (req.user.role === 'owner' && req.body.horseId) {
@@ -133,7 +92,7 @@ router.put('/:id', async (req, res) => {
     }
 
     if (req.body.riderId) {
-      const rider = await User.findOne({ _id: req.body.riderId, role: 'student' });
+      const rider = await User.findById(req.body.riderId);
 
       if (!rider) {
         return res.status(404).json({ message: 'Rider not found.' });
@@ -144,8 +103,8 @@ router.put('/:id', async (req, res) => {
       req.body.riderId = null;
     }
 
-    if (req.user.role === 'owner' && req.body.trainerId) {
-      const trainer = await User.findOne({ _id: req.body.trainerId, role: 'trainer' });
+    if (req.body.trainerId) {
+      const trainer = await User.findById(req.body.trainerId);
 
       if (!trainer) {
         return res.status(404).json({ message: 'Trainer not found.' });
@@ -162,23 +121,14 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', authorizeRoles('owner', 'trainer'), async (req, res) => {
-  let showSchedule;
+router.delete('/:id', async (req, res) => {
+  const existingShow = await ShowSchedule.findById(req.params.id);
 
-  if (req.user.role === 'trainer') {
-    showSchedule = await ShowSchedule.findOneAndDelete({
-      _id: req.params.id,
-      trainerId: req.user._id,
-    });
-  } else {
-    const existingShow = await ShowSchedule.findById(req.params.id);
-
-    if (!(await ownerCanAccessShow(req.user._id, existingShow))) {
-      return res.status(403).json({ message: 'You do not have access to this show schedule.' });
-    }
-
-    showSchedule = await ShowSchedule.findByIdAndDelete(req.params.id);
+  if (!(await ownerCanAccessShow(req.user._id, existingShow))) {
+    return res.status(403).json({ message: 'You do not have access to this show schedule.' });
   }
+
+  const showSchedule = await ShowSchedule.findByIdAndDelete(req.params.id);
 
   if (!showSchedule) {
     return res.status(404).json({ message: 'Show schedule not found.' });
