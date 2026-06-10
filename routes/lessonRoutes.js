@@ -1,18 +1,15 @@
 const express = require('express');
 const Lesson = require('../models/Lesson');
-const Horse = require('../models/Horse');
-const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const authorizeRoles = require('../middleware/roleMiddleware');
+const {
+  findOwnedHorse,
+  findOwnedLesson,
+  populateLesson,
+  validateOptionalUser,
+} = require('../utils/scheduleRouteHelpers');
 
 const router = express.Router();
-
-function populateLesson(query) {
-  return query
-    .populate('horseId', 'name')
-    .populate('trainerId', 'name email role')
-    .populate('studentId', 'name email role');
-}
 
 router.use(authMiddleware);
 router.use(authorizeRoles('owner'));
@@ -24,30 +21,16 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const horse = await Horse.findOne({ _id: req.body.horseId, ownerId: req.user._id });
+    const horse = await findOwnedHorse(req.user._id, req.body.horseId);
 
     if (!horse) {
       return res.status(404).json({ message: 'Horse not found.' });
     }
 
-    let trainer = null;
-    let student = null;
-
-    if (req.body.trainerId) {
-      trainer = await User.findById(req.body.trainerId);
-
-      if (!trainer) {
-        return res.status(404).json({ message: 'Trainer not found.' });
-      }
-    }
-
-    if (req.body.studentId) {
-      student = await User.findById(req.body.studentId);
-
-      if (!student) {
-        return res.status(404).json({ message: 'Student not found.' });
-      }
-    }
+    await Promise.all([
+      validateOptionalUser(req.body.trainerId, 'Trainer'),
+      validateOptionalUser(req.body.studentId, 'Student'),
+    ]);
 
     const lesson = await Lesson.create({
       ...req.body,
@@ -63,22 +46,18 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const lesson = await Lesson.findById(req.params.id);
+    const lesson = await findOwnedLesson(req.user._id, req.params.id);
 
-    if (!lesson || lesson.ownerId.toString() !== req.user._id.toString()) {
+    if (!lesson) {
       return res.status(404).json({ message: 'Lesson not found.' });
     }
 
     if (req.body.studentId) {
-      const student = await User.findById(req.body.studentId);
-
-      if (!student) {
-        return res.status(404).json({ message: 'Student not found.' });
-      }
+      await validateOptionalUser(req.body.studentId, 'Student');
     }
 
     if (req.body.horseId) {
-      const horse = await Horse.findOne({ _id: req.body.horseId, ownerId: req.user._id });
+      const horse = await findOwnedHorse(req.user._id, req.body.horseId);
 
       if (!horse) {
         return res.status(404).json({ message: 'Horse not found.' });
@@ -86,11 +65,7 @@ router.put('/:id', async (req, res) => {
     }
 
     if (req.body.trainerId) {
-      const trainer = await User.findById(req.body.trainerId);
-
-      if (!trainer) {
-        return res.status(404).json({ message: 'Trainer not found.' });
-      }
+      await validateOptionalUser(req.body.trainerId, 'Trainer');
     }
 
     Object.assign(lesson, req.body);
@@ -99,7 +74,7 @@ router.put('/:id', async (req, res) => {
     const populatedLesson = await populateLesson(Lesson.findById(lesson._id));
     return res.json(populatedLesson);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return res.status(error.statusCode || 400).json({ message: error.message });
   }
 });
 
