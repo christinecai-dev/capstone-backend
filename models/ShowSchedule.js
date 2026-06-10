@@ -1,8 +1,5 @@
 const mongoose = require('mongoose');
-
-function subtractMinutes(date, minutes) {
-  return new Date(date.getTime() - minutes * 60 * 1000);
-}
+const { calculateShowPlannerTimes } = require('../utils/showPlanner');
 
 const showScheduleSchema = new mongoose.Schema(
   {
@@ -94,10 +91,18 @@ showScheduleSchema.pre('validate', function calculateTimeline(next) {
     return next();
   }
 
-  this.warmupStartTime = subtractMinutes(this.showTime, this.warmupMinutes);
-  this.tackUpStartTime = subtractMinutes(this.warmupStartTime, this.tackUpMinutes);
-  this.arrivalTime = subtractMinutes(this.tackUpStartTime, this.bufferMinutes);
-  this.leaveBarnTime = subtractMinutes(this.arrivalTime, this.driveTimeMinutes);
+  const plannerTimes = calculateShowPlannerTimes({
+    showTime: this.showTime,
+    driveTimeMinutes: this.driveTimeMinutes,
+    tackUpMinutes: this.tackUpMinutes,
+    warmupMinutes: this.warmupMinutes,
+    bufferMinutes: this.bufferMinutes,
+  });
+
+  this.warmupStartTime = plannerTimes.warmupStartTime;
+  this.tackUpStartTime = plannerTimes.tackUpStartTime;
+  this.arrivalTime = plannerTimes.arrivalTime;
+  this.leaveBarnTime = plannerTimes.leaveBarnTime;
 
   return next();
 });
