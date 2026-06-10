@@ -16,7 +16,7 @@ const eventSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['farrier', 'deworming', 'vaccination', 'vet', 'board'],
+      enum: ['farrier', 'deworming', 'vaccination', 'vet', 'board', 'lesson', 'horse_show'],
     },
     title: {
       type: String,
